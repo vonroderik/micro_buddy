@@ -90,17 +90,29 @@ class IdentificacaoService:
                 resultado_bac = next((m for m in detalhes['meios'] if m.meio_id == m_id), None)
                 
                 if resultado_bac:
-                    # Se temos o dado, ele deve bater com a seleção
-                    # Lógica flexível: "Cresce (Lactose +)" contém "Cresce"
-                    if opcao_selecionada not in resultado_bac.opcao_dropdown and \
-                       resultado_bac.opcao_dropdown not in opcao_selecionada:
+                    val_sel = opcao_selecionada.lower()
+                    val_bac = resultado_bac.opcao_dropdown.lower()
+                    
+                    # Caso especial: "Não Cresce" vs "Cresce"
+                    # Se um tem "não" e o outro não, é um mismatch garantido
+                    if ("não" in val_sel) != ("não" in val_bac):
+                        match = False
+                        break
+                    
+                    # Se passou pelo "não", verificamos se há match parcial
+                    # (ex: "Cresce" bate com "Cresce (Lactose +)")
+                    if val_sel not in val_bac and val_bac not in val_sel:
                         match = False
                         break
                 else:
-                    # Se não temos o dado no banco para esta bactéria,
-                    # por segurança pedagógica, assumimos que não dá match 
-                    # com 'Cresce' ou 'Positivo' para evitar falsos positivos
-                    if "Cresce" in opcao_selecionada or "Positivo" in opcao_selecionada:
+                    # Se não temos o dado no banco:
+                    # Só falhamos o match se o usuário selecionou algo que indique presença (Cresce/Positivo)
+                    # mas o banco de dados é considerado a fonte da verdade para o que FOI testado.
+                    # Se o aluno testou e deu positivo, mas o banco não sabe, 
+                    # para fins educacionais, é melhor não mostrar a bactéria do que mostrar um dado errado.
+                    # No entanto, "Não Cresce" não deve excluir se o dado estiver faltando.
+                    if "não" not in opcao_selecionada.lower() and \
+                       ("cresce" in opcao_selecionada.lower() or "positivo" in opcao_selecionada.lower()):
                         match = False
                         break
             
@@ -114,14 +126,22 @@ class IdentificacaoService:
                 resultado_bac = next((t for t in detalhes['testes'] if t.parametro_id == p_id), None)
                 
                 if resultado_bac:
-                    # Match direto ou parcial (ex: 'Positivo' bate com 'Positivo Rápido')
-                    if opcao_selecionada.lower() not in resultado_bac.opcao_dropdown.lower() and \
-                       resultado_bac.opcao_dropdown.lower() not in opcao_selecionada.lower():
+                    val_sel = opcao_selecionada.lower()
+                    val_bac = resultado_bac.opcao_dropdown.lower()
+                    
+                    # Caso especial: "Negativo" vs "Positivo" 
+                    # (Já funciona pelo 'not in', mas vamos manter o padrão)
+                    if ("negativo" in val_sel) != ("negativo" in val_bac):
+                        match = False
+                        break
+
+                    if val_sel not in val_bac and val_bac not in val_sel:
                         match = False
                         break
                 else:
-                    # Se o teste foi marcado mas a bactéria não tem esse teste mapeado
-                    if "Positivo" in opcao_selecionada or "Ácido" in opcao_selecionada:
+                    # Se o teste foi marcado como Positivo/Ácido mas a bactéria não tem esse teste no banco
+                    if "não" not in opcao_selecionada.lower() and \
+                       ("positivo" in opcao_selecionada.lower() or "ácido" in opcao_selecionada.lower()):
                         match = False
                         break
             
